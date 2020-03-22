@@ -9,3 +9,5 @@ edition = "2018"
 [dependencies]
 rand = "0.7.3"
 rand_distr = "0.2.2"
+plotters = "0.2.12"
+minifb = "0.15.3"
