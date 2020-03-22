@@ -1,4 +1,7 @@
 mod resample;
+mod geometry;
+mod localization;
+
 use resample::resample;
 
 fn main() {
