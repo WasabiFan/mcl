@@ -2,7 +2,7 @@ use crate::geometry;
 use crate::stats::normal_pdf;
 use crate::resample::resample;
 
-use std::iter::FromIterator;
+use std::{cmp::Ordering, iter::FromIterator};
 
 use rand::thread_rng;
 use rand_distr::{Normal, Uniform, Distribution};
@@ -55,7 +55,8 @@ impl LaserScanMeasurement {
 
 pub struct LocalizationParticleFilter {
     pub particles: Vec<Pose>,
-    map: Map
+    map: Map,
+    pose_estimate: Option<Pose>
 }
 
 impl LocalizationParticleFilter {
@@ -67,7 +68,8 @@ impl LocalizationParticleFilter {
             particles: Vec::from_iter(
                 (0..num_particles).map(|_| Pose { location: geometry::Point { x: x.sample(&mut rng), y: y.sample(&mut rng) } })
             ),
-            map: map.clone()
+            map: map.clone(),
+            pose_estimate: None
         }
     }
 
@@ -88,6 +90,18 @@ impl LocalizationParticleFilter {
         let norm_factor: f64 = likelihoods.iter().sum();
         let weights: Vec<f64> = likelihoods.iter().map(|l| l / norm_factor).collect();
 
+        // TODO: What's the smarter way to compute this pose estimate?
+        // Currently, this is only based on the most recent measurement.
+        self.pose_estimate = weights
+            .iter()
+            .zip(&self.particles)
+            .max_by(|(a, _), (b, _)| a.partial_cmp(b).unwrap_or(Ordering::Equal))
+            .and_then(|(_, pose_estimate)| Some(pose_estimate.clone()));
+
         self.particles = resample(&self.particles[..], &weights[..]);
+    }
+
+    pub fn get_pose_estimate(&self) -> Option<Pose> {
+        self.pose_estimate
     }
 }

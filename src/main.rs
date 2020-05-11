@@ -81,7 +81,21 @@ impl VisualizerApp {
                 let (x, y) = map_point_to_window(particle.location);
                 root.draw(&Circle::new((x, y), 1, ShapeStyle::from(&RED).filled()))?;
             }
-            root.draw(&Circle::new(map_point_to_window(self.true_pose.location), 4, ShapeStyle::from(&GREEN).filled()))?;
+
+            if let Some(pose_estimate) = self.mcl.get_pose_estimate() {
+                root.draw(&Circle::new(
+                    map_point_to_window(pose_estimate.location), 
+                    4, 
+                    ShapeStyle::from(&YELLOW).filled())
+                )?;
+            }
+
+            root.draw(&Circle::new(
+                map_point_to_window(self.true_pose.location), 
+                    4, 
+                    ShapeStyle::from(&GREEN).filled()
+                ))?;
+
             drop(root);
             window.update_with_buffer(unsafe { std::mem::transmute(&buf[..]) }, VISUALIZER_WIDTH, VISUALIZER_HEIGHT)?;
         }
