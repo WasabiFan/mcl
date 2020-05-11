@@ -9,8 +9,8 @@ use rand_distr::{Normal, Uniform, Distribution};
 
 #[derive(Debug, Copy, Clone)]
 pub struct Map {
-    pub width: usize,
-    pub height: usize
+    pub width: f64,
+    pub height: f64
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -69,7 +69,7 @@ impl LocalizationParticleFilter {
     pub fn predict(&mut self, odom: OdometryMeasurement) {
         let mut rng = thread_rng();
         let vx = Normal::new(odom.vx, odom.sigma).unwrap();
-        let vy = Normal::new(odom.vx, odom.sigma).unwrap();
+        let vy = Normal::new(odom.vy, odom.sigma).unwrap();
         for particle in self.particles.iter_mut() {
             particle.location.x += vx.sample(&mut rng);
             particle.location.y += vy.sample(&mut rng);
