@@ -1,6 +1,12 @@
 use std::vec::Vec;
 use rand::random;
 
+/// Given a discrete distribution (a set of value/probability pairs), returns a
+/// new vector in which some values have been omitted and some have been
+/// duplicated such that the new uniform-probability discrete distribution
+/// is a new draw from the original.
+///
+/// The weights are expected to sum to 1.
 pub fn resample<T: Copy>(values: &[T] , weights: &[f64]) -> Vec<T> {
     // Implements Algorithm 1 from:
     // J. Carpenter, P. Clifford, and P. Fernhead, “An improved particle filter
