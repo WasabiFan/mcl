@@ -23,71 +23,80 @@ use plotters::prelude::*;
 const MAP_WIDTH: f64 = 10.;
 const MAP_HEIGHT: f64 = 10.;
 
-const VISUALIZER_WIDTH: usize = 200;
-const VISUALIZER_HEIGHT: usize = 200;
+const VISUALIZER_WIDTH: usize = 600;
+const VISUALIZER_HEIGHT: usize = 600;
 
-const LASERSCAN_STDDEV: f64 = 10.;
+const LASERSCAN_STDDEV: f64 = 0.2;
 
 fn map_point_to_window(point: Point) -> (i32, i32) {
     ((point.x / MAP_WIDTH * VISUALIZER_WIDTH as f64) as i32, (point.y / MAP_HEIGHT * VISUALIZER_HEIGHT as f64) as i32)
 }
 
-enum MCLPhase {
-    Predict, Update
+struct VisualizerApp {
+    map: Map,
+    true_pose: Pose,
+    mcl: LocalizationParticleFilter,
 }
 
-fn main() -> Result<(), Box<dyn Error>> {
-    let mut buf = vec![0u8; VISUALIZER_WIDTH * VISUALIZER_HEIGHT * 4];
-    let mut window = Window::new(
-        "Monte Carlo Localization Demo",
-        VISUALIZER_WIDTH,
-        VISUALIZER_HEIGHT,
-        WindowOptions::default(),
-    )?;
+impl VisualizerApp {
+    pub fn new() -> VisualizerApp {
+        let map = Map { width: MAP_WIDTH, height: MAP_HEIGHT };
+        VisualizerApp {
+            map,
+            true_pose: Pose { location: Point { x: MAP_WIDTH / 2., y: MAP_HEIGHT / 2.} },
+            mcl: LocalizationParticleFilter::new(500, &map)
+        }
+    }
 
-    let map = Map { width: MAP_WIDTH, height: MAP_HEIGHT };
-    let mut true_pose = Pose { location: Point { x: MAP_WIDTH / 2., y: MAP_HEIGHT / 2.} };
-    let mut mcl = LocalizationParticleFilter::new(500, &map);
-    let mut next_phase: MCLPhase = MCLPhase::Predict;
+    pub fn main(&mut self) -> Result<(), Box<dyn Error>> {
+        let mut buf = vec![0u8; VISUALIZER_WIDTH * VISUALIZER_HEIGHT * 4];
+        let mut window = Window::new(
+            "Monte Carlo Localization Demo",
+            VISUALIZER_WIDTH,
+            VISUALIZER_HEIGHT,
+            WindowOptions::default(),
+        )?;
 
-    while window.is_open() && !window.is_key_down(Key::Escape) {
-
-        if let Some(keys) = window.get_keys_pressed(KeyRepeat::No) {
-            for key in keys {
-                match key {
-                    Key::Space => {
-                        next_phase = match next_phase {
-                            MCLPhase::Predict => {
-                                mcl.predict(OdometryMeasurement { vx: 0.1, vy: 0.0, sigma: 0.05 });
-                                true_pose.location += (0.1, 0.);
-                                MCLPhase::Update
-                            }
-                            MCLPhase::Update => {
-                                mcl.update(&LaserScanMeasurement::simulated_measure_from(&true_pose, &map, LASERSCAN_STDDEV));
-                                MCLPhase::Predict
-                            }
+        while window.is_open() && !window.is_key_down(Key::Escape) {
+            if let Some(keys) = window.get_keys_pressed(KeyRepeat::No) {
+                for key in keys {
+                    match key {
+                        Key::Left  => self.apply_velocity_step(-0.1, 0.),
+                        Key::Right => self.apply_velocity_step(0.1, 0.),
+                        Key::Up    => self.apply_velocity_step(0., -0.1),
+                        Key::Down  => self.apply_velocity_step(0., 0.1),
+                        _ => {
+                            continue;
                         }
-                    }
-                    _ => {
-                        continue;
                     }
                 }
             }
+
+            let root =
+            BitMapBackend::<BGRXPixel>::with_buffer_and_format(&mut buf[..], (VISUALIZER_WIDTH as u32, VISUALIZER_HEIGHT as u32))?
+                .into_drawing_area();
+            root.fill(&BLACK)?;
+
+            for particle in &self.mcl.particles {
+                let (x, y) = map_point_to_window(particle.location);
+                root.draw(&Circle::new((x, y), 1, ShapeStyle::from(&RED).filled()))?;
+            }
+            root.draw(&Circle::new(map_point_to_window(self.true_pose.location), 4, ShapeStyle::from(&GREEN).filled()))?;
+            drop(root);
+            window.update_with_buffer(unsafe { std::mem::transmute(&buf[..]) }, VISUALIZER_WIDTH, VISUALIZER_HEIGHT)?;
         }
 
-        let root =
-        BitMapBackend::<BGRXPixel>::with_buffer_and_format(&mut buf[..], (VISUALIZER_WIDTH as u32, VISUALIZER_HEIGHT as u32))?
-            .into_drawing_area();
-        root.fill(&BLACK)?;
-
-        for particle in &mcl.particles {
-            let (x, y) = map_point_to_window(particle.location);
-            root.draw(&Circle::new((x, y), 1, ShapeStyle::from(&RED).filled()))?;
-        }
-        root.draw(&Circle::new(map_point_to_window(true_pose.location), 4, ShapeStyle::from(&GREEN).filled()))?;
-        drop(root);
-        window.update_with_buffer(unsafe { std::mem::transmute(&buf[..]) }, VISUALIZER_WIDTH, VISUALIZER_HEIGHT)?;
+        Ok(())
     }
 
-    Ok(())
+    fn apply_velocity_step(&mut self, vx: f64, vy: f64) {
+        self.mcl.predict(OdometryMeasurement { vx, vy, sigma: 0.05 });
+        self.true_pose.location += (vx, vy);
+        self.mcl.update(&LaserScanMeasurement::simulated_measure_from(&self.true_pose, &self.map, LASERSCAN_STDDEV));
+    }
+}
+
+fn main() -> Result<(), Box<dyn Error>> {
+    let mut app = VisualizerApp::new();
+    app.main()
 }
