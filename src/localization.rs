@@ -36,9 +36,14 @@ pub struct LaserScanMeasurement {
 
 impl LaserScanMeasurement {
     pub fn simulated_measure_from(pose: &Pose, map: &Map, sigma: f64) -> LaserScanMeasurement {
-        // TODO: noise
         // TODO: is it smart to have the noise stddev be directly tied to particle likelihood?
-        LaserScanMeasurement { down: pose.location.y, left: pose.location.x, sigma }
+        let pos_noise = Normal::new(0., sigma).unwrap();
+        let mut rng = thread_rng();
+        LaserScanMeasurement {
+            down: pose.location.y + pos_noise.sample(&mut rng),
+            left: pose.location.x + pos_noise.sample(&mut rng),
+            sigma
+        }
     }
 
     pub fn likelihood(&self, pose: &Pose, map: &Map) -> f64 {
