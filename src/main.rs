@@ -79,7 +79,11 @@ impl VisualizerApp {
 
             for particle in &self.mcl.particles {
                 let (x, y) = map_point_to_window(particle.location);
-                root.draw(&Circle::new((x, y), 1, ShapeStyle::from(&RED).filled()))?;
+                root.draw(&Circle::new(
+                    (x, y), 
+                    1, 
+                    ShapeStyle::from(&RED).filled())
+                )?;
             }
 
             if let Some(pose_estimate) = self.mcl.get_pose_estimate() {
