@@ -35,7 +35,7 @@ pub struct LaserScanMeasurement {
 }
 
 impl LaserScanMeasurement {
-    pub fn simulated_measure_from(pose: &Pose, map: &Map, sigma: f64) -> LaserScanMeasurement {
+    pub fn simulated_measure_from(pose: &Pose, _map: &Map, sigma: f64) -> LaserScanMeasurement {
         // TODO: is it smart to have the noise stddev be directly tied to particle likelihood?
         let pos_noise = Normal::new(0., sigma).unwrap();
         let mut rng = thread_rng();
@@ -46,7 +46,7 @@ impl LaserScanMeasurement {
         }
     }
 
-    pub fn likelihood(&self, pose: &Pose, map: &Map) -> f64 {
+    pub fn likelihood(&self, pose: &Pose, _map: &Map) -> f64 {
         let left_expected = pose.location.x;
         let down_expected = pose.location.y;
         normal_pdf(self.down, self.sigma, down_expected) * normal_pdf(self.left, self.sigma, left_expected)
@@ -68,7 +68,7 @@ impl LocalizationParticleFilter {
             particles: Vec::from_iter(
                 (0..num_particles).map(|_| Pose { location: geometry::Point { x: x.sample(&mut rng), y: y.sample(&mut rng) } })
             ),
-            map: map.clone(),
+            map: *map,
             pose_estimate: None
         }
     }
@@ -95,8 +95,7 @@ impl LocalizationParticleFilter {
         self.pose_estimate = weights
             .iter()
             .zip(&self.particles)
-            .max_by(|(a, _), (b, _)| a.partial_cmp(b).unwrap_or(Ordering::Equal))
-            .and_then(|(_, pose_estimate)| Some(pose_estimate.clone()));
+            .max_by(|(a, _), (b, _)| a.partial_cmp(b).unwrap_or(Ordering::Equal)).map(|(_, pose_estimate)| *pose_estimate);
 
         self.particles = resample(&self.particles[..], &weights[..]);
     }
